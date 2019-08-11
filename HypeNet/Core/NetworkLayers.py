@@ -248,13 +248,15 @@ class BatchNormalization:
 		self.epsilon = epsilon
 		self.running_mean = running_mean
 		self.running_var = running_var
-		self.x_original_shape = None
+		self.x_temp_shape = None
 
 	def forward(self, x, train_flg = False):
 		if(x.ndim == 4):								#Convolution in Previous Layer
-			self.x_original_shape = x.shape 			#(N, C, H, W)
-			x = x.transpose(1, 2, 3, 0)					#(C, H, W, N)
-			x = x.reshape(-1, x.shape[3])				#(C * H * W, N)
+			#(N, C, H, W)
+			x = x.transpose(0, 2, 3, 1)					#(N, H, W, C)
+			self.x_temp_shape = x.shape
+			x = x.reshape(-1, x.shape[3])				#(N * H * W, C)
+			x = x.T										#(C, N * H * W)
 
 		self.x = x
 		out = self.__forward(self.x, train_flg)
@@ -295,11 +297,12 @@ class BatchNormalization:
 
 	def backward(self, dout, calculate_dx = True):
 		dx = self.__backward(dout, calculate_dx)
-		if(self.x_original_shape == None):
+		if(self.x_temp_shape == None):
 			dx = dx.reshape(*self.x.shape)
 		else:
-			dx = dx.T 								#(N, C * H * W)
-			dx = dx.reshape(*self.x_original_shape)	#(N, C, H, W)
+			dx = dx.T 								#(N * H * W, C)
+			dx = dx.reshape(self.x_temp_shape)		#(N, H, W, C)
+			dx = dx.transpose(0, 3, 1, 2)
 
 		return dx
 
